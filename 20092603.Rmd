@@ -1,0 +1,1216 @@
+---
+title: "20092603"
+author: "STAT0030: ICA2"
+output: pdf_document
+---
+
+# Exploratory Data Analysis
+
+Firstly, the grocery.csv dataset was loaded in R. Based on the nature of the variables
+some of them needed to be transformed into different types. "STORE_NUM","UPC",
+"MANUFACTURER" should be factors while "DISPLAY","FEATURE","TRP_ONLY" should be logical/boolean.
+
+```{r, include = FALSE}
+# use eval = TRUE if you want the output to appear in your final report. 
+groc_df <- read.csv("grocery.csv")
+# View(groc_df)
+str(groc_df) #inspecting the structure of the dataset
+# some variables need to be factor or boolean
+
+#  "STORE_NUM","UPC","MANUFACTURER" should be factors
+names_factor <-c("STORE_NUM","UPC","MANUFACTURER")
+# using lapply to convert all 3 of them
+groc_df[,names_factor] <- lapply(groc_df[,names_factor] , factor)
+
+# "DISPLAY","FEATURE","TRP_ONLY" will be coded as logical
+groc2 = groc_df 
+
+groc2$DISPLAY = as.logical(groc2$DISPLAY)
+groc2$FEATURE = as.logical(groc2$FEATURE)
+groc2$TPR_ONLY = as.logical(groc2$TPR_ONLY)
+
+```
+
+```{r, include=F}
+library(knitr)
+knitr::kable(head(groc2[,1:7], n=5))# inspecting first 8 rows of dataset
+dim(groc2) #inspecting number of rows and columns
+```
+Since UNITS is the response variable, which takes non-negative integer values, there
+are three more numerical values: PRICE, BASE_PRICE and WEEK_END_DATE
+We get some summary statistics for numerical variables. By just looking at the means
+and min/max values it is clear that UNITS is heavily skewed.
+```{r, include=F}
+knitr::kable(summary(groc2)) #obtaining some initial descreptive staistics
+
+summary(groc2)
+```
+
+```{r, echo=F, eval=T, warning=F, fig.height=4}
+
+num_vars <- sapply(groc2,is.numeric)
+library(pastecs) #for stat.desc function
+#table of descriptive statistics for the numerical variables
+desc_stats <- t(stat.desc(groc2[,num_vars]))
+knitr::kable(desc_stats[,c(3,4,5,6,8,9,12,14)], digits = 1)
+#knitr::kable(desc_stats[,8:14], digits = 1)
+
+
+```
+
+Based on the scatterplots, correlation coefficients and density plots for
+the numerical variables the distribution of BASE_PRICE seems to be bimodal, perhaps
+a mixture of 2 or 3 different sub distributions. The distribution of PRICE seems 
+to have 3 peaks while the distribution of UNITS seems to be Gamma with longer tail,
+perhaps log-normal. There is some clear linear relationship between PRICE and BASE
+PRICE. There is also a weak linear relationship between PRICE and UNITS.
+
+```{r, echo = FALSE, eval = F, warning=F}
+#pairs(groc2[,num_vars])
+
+library(GGally)
+ggpairs(groc2[,num_vars]) #distribution of base price seems to be bimodal, maybe mixture of 2 or 3 different sub distributions
+#distribution of price seems to have 3 peaks
+#distribution of UNITS seems to be Gamma with longer tail, perhaps lognormal
+# there is some clear linear relationship between price and base price, indicated by both the 
+#sctterplot and the correlation coefficient
+
+#ggpairs(groc2[,c(10,5,7,8)])
+#str(groc2)
+#ggpairs(groc2[,c(2,10,5)])
+#ggpairs(groc2[,c(2,10,6)])
+#ggpairs(groc2[,c(2,10,7)]) #items on display seem to sell more units based on boxplots
+#ggpairs(groc2[,c(2,10,8)])# items that were featured on leaflet seem to sell more units based on boxplots
+#ggpairs(groc2[,c(2,10,9)])# no significant difference in sales is observed for products with temp price reduction
+
+```
+
+
+```{r, echo = FALSE, eval = FALSE}
+
+SALESXPRICE <- groc2$UNITS*groc2$PRICE
+
+```
+
+By plotting the PRICE against UNITS for every manufacturer and indicating the items
+on DISPLAY with different color it becomes clear that items on display amount more 
+sales, especially for prices on the lower end of the PRICE distribution for each MANUFACTURER.
+```{r, echo = FALSE, eval = F}
+
+library(ggplot2)
+#par(mfrow=c(1,2))
+ggplot(groc2, aes(x=PRICE, y=UNITS,colour= DISPLAY))+
+  geom_point()+
+  theme_bw()+
+  theme(legend.position="bottom")+
+  #scale_x_continuous(trans='log')+
+  ylab("Units sold")+
+  facet_wrap(~MANUFACTURER)+
+  xlab("Final Price of Item")+
+  ggtitle("Scatterplot of Price vs Units sold by manufacturer",
+          subtitle="Different colors based on whether product was part of in-store promotional display")+
+  scale_color_brewer(palette="Dark2")
+# The range of prices and units sold per manufacturer as well as the items 
+# that were on display
+# Generally, items on display amount more sales, especially for prices on the 
+# lower end of the price distribution for each manufacturer
+```
+In the following plot, items that were featured on in-store leaflet amount more 
+sales, especially for prices on the lower end of the PRICE distribution for each product.
+The negative linear relationship between the log of UNITS and PRICE becomes clearer.
+From the violin plots of UNITS vs the three boolean variables it is evident that there 
+is a difference in the distribution for each level of DISPLAY and FEATURE, but not
+a significant one for TPR_ONLY, which suggests that it does not carry much information
+about the variable UNITS. Also,the distribution of UNITS is heavily skewed. By applying log transformation the 
+distribution becomes more symmetrical.
+
+```{r, echo = FALSE, eval = T, warning=F, fig.height=5}
+library(ggplot2)
+ggplot(groc2, aes(x=PRICE, y=UNITS,colour= FEATURE))+
+  geom_point()+
+  theme_bw()+
+  theme(legend.position="right")+
+  scale_y_continuous(trans='log',labels = scales::number_format(accuracy = 0.01,
+                                 decimal.mark = '.'))+
+  ylab("UNITS sold")+
+  xlab("Regular price of item")+
+  ggtitle("Scatterplot of Price vs Units sold per product (Lin-Log scale)",
+          subtitle="Different colors based on whether product was in in-store leaflet")+
+  facet_wrap(~UPC)+
+  scale_color_brewer(palette="Set1")
+# The range of prices and units sold per PRODUCT as well as the items 
+# that were featured on leaflet
+# Generally, items that were featured amount more sales, especially for prices on 
+# the lower end of the price distribution for each product
+
+```
+
+
+
+```{r, echo = FALSE, eval = FALSE}
+ggplot(groc2, aes(FEATURE, UNITS, fill=DISPLAY))+
+  geom_boxplot()+
+  #facet_wrap(~DISPLAY)+
+  theme_bw()+
+  scale_fill_brewer(palette="Spectral")+
+  theme( legend.position="bottom")+
+  ylab("Units sold")+
+  xlab("Products Featured on in-store leaflet")+
+  ggtitle("Boxplots of Units sold for Featured and/or Displayed products ")+
+  guides(fill=guide_legend(title="Product on in-store display"))
+
+# Seems that Featured and Displayed products had more sales, even some extreme values,
+# since mean units sold is ~12 and for displayed and feature there are obs >120
+```
+
+
+```{r, echo = FALSE, eval = T, fig.height=3, warning=F}
+a=ggplot(groc2, aes(DISPLAY,UNITS,fill=DISPLAY))+
+    geom_violin(trim=F)+
+    theme_bw()+
+    stat_summary(geom = "point",fun = "mean", col = "black",size =3,shape = 23,fill = "grey")+
+    theme(legend.position="bottom",legend.text=element_text(size=7),legend.title=element_text(size=0))+
+    scale_y_continuous(trans='log')+
+  scale_fill_brewer(palette="Set2")
+  
+b=ggplot(groc2, aes(FEATURE,UNITS,fill=FEATURE))+
+    geom_violin(trim=F)+
+    theme_bw()+
+    stat_summary(geom = "point",fun = "mean", col = "black",size =3,shape = 23,fill = "grey")+
+    theme(legend.position="bottom",legend.text=element_text(size=7),legend.title=element_text(size=0))+
+  scale_y_continuous(trans='log')+
+  scale_fill_brewer(palette="Set2")
+  
+c=ggplot(groc2, aes(TPR_ONLY,UNITS,fill=TPR_ONLY))+
+    geom_violin(trim=F)+
+    theme_bw()+
+    stat_summary(geom = "point",fun = "mean", col = "black",size =3,shape = 23,fill = "grey")+
+    theme(legend.position="bottom",legend.title=element_text(size=0),legend.text=element_text(size=7))+
+    scale_y_continuous(trans='log')+
+    scale_fill_brewer(palette="Set2")
+  
+library(ggpubr)
+
+p <- ggarrange(a,b,c, ncol=3)
+annotate_figure(p,"Violin plots of Units sold (log scale) vs all of the boolean variables")
+# there's significant difference for display and feature not so much for tpr_only
+
+```
+```{r, echo = FALSE, eval = FALSE}
+
+# The distribution of UNITS is heavily skewed. By applying log transformation 
+# the distribution becomes more symmetrical.
+# Useful note for building models later.
+hist(groc2$UNITS)
+hist(log(groc2$UNITS))
+
+# Aggregating (means) Units by Week_end_date to illustrate average sales by week
+units_by_date <- aggregate(UNITS~WEEK_END_DATE,data=groc2 , mean)
+plot(UNITS~WEEK_END_DATE, data=units_by_date, type="b", main="Average Units sold by week")
+# There are a few weeks that are outliers (perhaps holidays?)
+# Lag terms in models?  
+```
+##    Considerarations for repsonse variable distribution for GLM models
+
+The distribution that seems to fit the response variable (UNITS) better is the Log-Normal.
+However, since it is not a part of the exponential family it cannot be used to
+fit a GLM model. The Gamma distribution could potentially be a candidate.
+On the other hand, if we consider the UNITS variable as a count variable, since it represents the amount
+of sales, it would be reasonable to try a Poisson GLM regression model. However,
+as it is suggested by the log-likelihhod of the best fitted Poisson distribution
+the fit is rather poor. 
+
+By further inspection of the distribution and the GLM model (next section), there's 
+evidence of overdispersion (overidispersion parameter phi is estimated to be ~5 instead
+of 1 which is assumed and held constant by Poisson regression).
+Possible solutions to this problem could be fitting a quasipoisson regression model
+or a Negative Binomial GLM model. It also seems that that the Gamma or Negative Binomial 
+might be fit better since the likelihoods of their distributions are also higher than 
+that of the Poisson distribution.
+
+```{r, echo = FALSE, eval = T, warning=F}
+
+
+library(MASS)
+a=fitdistr(groc2$UNITS,'gamma')
+c=fitdistr(groc2$UNITS, 'lognormal')
+#d=fitdistr(groc2$UNITS,'logistic')
+e=fitdistr(groc2$UNITS,'chi-squared',start=list(df=1),method='Brent',
+           lower=0.1, upper=10)
+f=fitdistr(groc2$UNITS,'exponential')
+g=fitdistr(groc2$UNITS,'t')
+j=fitdistr(groc2$UNITS,"Poisson")
+h <- fitdistr(groc2$UNITS,"negative binomial")
+
+Likelihoods <- data.frame("Likelihoods"=c("Gamma" = a$loglik, "LogNormal"=c$loglik,
+          "ChiSquared"=e$loglik,"Exponential"=f$loglik,"Poisson"=j$loglik, 
+          "NegBinomial"=h$loglik), 
+          "Estimated Parameters"= rbind("Gamma" = a$estimate, 
+          "LogNormal"=c$estimate, "ChiSquared"=e$estimate,"Exponential"=f$estimate,
+          "Poisson"=j$estimate, "NegBinomial"=h$estimate))
+
+colnames(Likelihoods) = c("Likelihood", "parameter1", "parameter2")
+Likelihoods$parameter2[Likelihoods$parameter1==Likelihoods$parameter2] <- NA
+
+
+knitr::kable(Likelihoods[order(Likelihoods$Likelihood, decreasing = T),], digits = 3)
+
+
+# The distribution that seems to fit the data (UNITS) better is the Log-Normal.
+# However, since it is not a part of the exponential family it cannot be used to
+# fit a glm model. The Gamma distribution could potentially be a candidate.
+
+# By taking into account that the UNITS variable is the amount of sales which means
+# it is count data, it would be reasonable to try a Poisson glm regression model.
+
+# By further inspecting the distribution and the glm model, there's evidence of 
+# overdispersion (overidispersion parameter phi is estimated to be ~5.32) instead
+# of 1 which is assumed and held constant by Poisson regression
+
+# Possible solutions to this problem could be fitting a quasipoisson regression model
+# or a Negative Binomial glm model. It also seems that the likelihood of the 
+# Negative Binomial is also higher than that of the Poisson distribution.
+
+```
+
+## Linear Regression Models
+Based on the EDA for the grocery dataset the variables STORE_NUM, TPR_ONLY and 
+MANUFACTURER seem to not carry significant amount of information regarding the 
+response variable. So for simplicity of the models they will not be included.
+Also, BASE_PRICE is highly correlated with PRICE and to avoid violating the collinearity
+assumption for the covariates it will also be excluded from the models.
+The Linear Model with the covariates PRICE, WEEK_END_DATE, UPC, FEATURE, DISPLAY had
+a very low $R^2$ ($45%$) and there were severe violations of the assumptions of 
+homoscedasticity and normality of the residuals. A cure for that seemed to be the 
+Log-transformation of the response variable (UNITS). This also improved the $R^2$ ($49.4%$).
+
+The data were splitted in 10 folds and the first nine were used as a training set.
+The RMSE of the predictions made by the Log transformed Linear model was $9.872$.
+
+```{r, echo = FALSE, eval = TRUE}
+
+#splitting the data into 10 folds
+set.seed(30)
+n <- nrow(groc2)
+k <- 10 # Number of folds
+fold_idx <- sample(cut(1:n, breaks = k, labels = FALSE))
+
+test_idx <- which(fold_idx == 10)
+train_set <- groc2[-test_idx, ]#1-9 folds will be used for training
+test_set <- groc2[test_idx, ]
+```
+
+```{r, echo = FALSE, eval = FALSE}
+# Linear models
+#str(groc2)
+
+# Based on the insight from the EDA I chose not to include BASE_PRICE due to 
+# collinearity (Correlation with price ~0.85)
+# I also chose not to include some categorical variables for simplicity
+# and TPR_ONLY, STORE_NUM, MANUFACTURER due to the similar distributions of units for each of its values
+lm1 <- lm(UNITS~.-BASE_PRICE-STORE_NUM-TPR_ONLY-MANUFACTURER, data=train_set)
+summary(lm1)  # R-squared 45%, most covariates are significant based on the t-tests
+
+# Some diagnostic plots
+par(mfrow=c(2,2))
+plot(lm1)
+par(mfrow=c(1,1))
+# Heteroscedasticity is present based on residual vs fitted plot
+# Normality assumption is violated based on residual's Q-Q plot
+
+# log transformation for the response to try and fix the variance and normality
+lm2 <- lm(log(UNITS)~.-BASE_PRICE-STORE_NUM-TPR_ONLY-MANUFACTURER, data=train_set)
+summary(lm2)  # R-squared 49.4%, most covariates are significant based on the t-tests
+
+# Some diagnostic plots
+par(mfrow=c(2,2))
+plot(lm2)
+par(mfrow=c(1,1))
+# The normality assumption violation seems to have been fixed
+# The residuals on residuals vs fitted plot are also more scattered around zero
+# However there appear to be straight lines on the residuals 
+
+
+cat("The RMSE of the Linear model with Log transformation is",
+    sqrt(mean(( exp(predict(lm2, test_set)) - test_set$UNITS)^2 ) ) ) 
+#rmse on 10th fold is 9.872
+
+
+```
+## Generalised Linear Regression Models
+### Poisson Regression
+If we treat the response variable as a count variable, the first thing that comes 
+in mind is Poisson regression. This was the first attempt, Poisson GLM with Log-link
+but the residual deviance was rather high, heteroscedasticity was present based on 
+residual vs fitted plot and the normality assumption was violated based on residual's Q-Q plot.
+
+The Poisson regression model keeps the dispersion parameter fixed at 1, implying equality
+of the mean and the variance. The variance and mean ratio for UNITS is $15.24 >> 1$
+which implies overdispersion in our data. An estimation of the dispersion parameter 
+as Residual deviance divided by the residual degrees of freedom yielded $\hat\phi = 4.72$.
+The following are some ways to account for overdispersion in the data. 
+
+### Quasipoisson, Negative Binomial, Quasi Regression
+A quasipoisson regression model with Log-link was fitted. The dispersion parameter
+was estimated as $5.25$. The residual deviance is lower than the Poisson model, so is 
+the QAIC (although I am not depending on QAIC too much since it is not widely accepted).
+The assumptions that were violated in the Poisson case are still not cured.
+Negative Binomial regression models were also considered. The one with the log-link
+gave significantly lower residuals deviance (about $1/4$ of the Poisson deviance).
+It also managed to cure the heteroscedasticity to a certain point. The residual's normality
+is still violated on both tails.
+Several combinations of variance and link functions were considered for the Quasi regression models,
+such as the variance 
+being a function of the mean or the second and third power of the mean and link functions 
+such as the logarithm, square root and the identity function.
+Some interesting results were in the case of the variance being a equal to the 
+square of the mean with log link function in which the deviance was much lower than all 
+of the previous models, the residuals were almost normally distributed but the 
+residual's variance was not constant. Another model was with the variance being equal
+to the mean, a log link function and a log transformation on the response. This resulted
+in the lowest deviance so far, with residuals normally distributed and with their variance 
+not being far from constant.
+
+**Gamma Regression:**Since the UNITS variable takes many different values on the $(0,\infty)$ interval
+it can be treated as a continuous variable. The Gamma distribution is part of 
+the exponential family of distributions and so we can fit a GLM model with the assumption
+that the response is following a Gamma distribution, since it seemed from the previous 
+analysis that it fits the data well.
+The residuals deviance was similar to the quasi regression models, although the
+diagnostic plots were similar to the Negative Binomial model.
+
+**Predictions:**In terms of predictions on the $10%$ test set, the Poisson and Quasipoisson with loh 
+links performed similarly, with RMSEs $9.6979$ with the Negative Binomial regression
+being slightly worse $9.72424$ and then the Gamma and the quasi regression with var=$mu^2$
+with $9.72716$. The worst performing models were the linea regression and the quasi
+with transformed response.
+
+```{r, echo = FALSE, eval = FALSE}
+# Another approach is the use of glm models 
+# Due to the fact that the response variable is UNITS sold, we can treat it as counts
+# Hence, a first approach would be to fit a poisson regression model from the glm family
+library(MASS)
+poisson_glm_log <- glm(UNITS~.-BASE_PRICE-STORE_NUM-TPR_ONLY-MANUFACTURER, #Poisson regression
+                    data=train_set, family = poisson(link="log")) # log link function
+summary(poisson_glm_log) # All covariates are significant at 5%
+# Residual Deviance is 42356 AIC: 77670
+
+# Some diagnostic plots
+par(mfrow=c(2,2))
+plot(poisson_glm_log)
+par(mfrow=c(1,1))
+# Heteroscedasticity is present based on residual vs fitted plot
+# Normality assumption is violated based on residual's Q-Q plot
+
+
+# The Poisson regression model keeps the dispersion parameter fixed at 1, 
+# implying equal mean and variance
+# The variance and mean ratio for UNITS is 15.24 >> 1 implies overdispersion
+var(groc2$UNITS)/mean(groc2$UNITS)
+# Estimating the dispersion parameter as Residual deviance/
+# The Residual deviance divided by the residual degrees of freedom should also be 1
+poisson_glm_log$deviance/poisson_glm_log$df.residual
+# But in this case it is 4.72
+
+# Two ways to account for overdispersion: 
+# 1) Quasipoisson regression
+# 2) Negative Binomial regression
+
+# 1) Quasipoisson regression with log link
+quasi_glm_log <- glm(UNITS~.-BASE_PRICE-STORE_NUM-TPR_ONLY-MANUFACTURER, 
+                 data=train_set, family = quasipoisson(link="log"))
+summary(quasi_glm_log) # most covariates are significant at 5%
+# Residual Deviance is 42356
+# Dispersion parameter 5.25
+
+# model's AIC cannot be calculated since there's no Likelihhod function
+# A way around that could be calculating QAIC  = -2(maximum loglik)/phi + 2df
+# where loglik is the log likelihood of the Poisson regression model and phi the 
+# dispersion estimate
+#(QAIC_quasi_glm_log <- -2*logLik(poisson_glm_log)/(5.25)
+#      +2*quasi_glm_log$df.residual)  # QAIC is 32748
+
+# Some diagnostic plots
+par(mfrow=c(2,2))
+plot(quasi_glm_log)
+par(mfrow=c(1,1))
+# Heteroscedasticity is still present based on residual vs fitted plot
+# Normality assumption is still violated based on residual's Q-Q plot
+
+# ANOVA table with f test (unknown dispersion)
+anova(quasi_glm_log, test = "F") #all significant
+
+
+# Different link functions have been considered such as sqrt and identity
+# Res deviance for sqrt was 48110 slightly bigger than the log
+# Similar for identity link 50872  
+# The heteroscedasticity problem is better, nonlinearity is not addressed though
+
+# Based on residual plots and residual deviance quasi regression with variance = mu^2
+#  link sqrt produces good results,the only issue is the fatter upper tail of res
+quasi_glm_sqrt <- glm(UNITS~.-BASE_PRICE-STORE_NUM-TPR_ONLY-MANUFACTURER, 
+                 data=train_set, family = quasi(variance="mu^2",link="sqrt")) 
+summary(quasi_glm_sqrt) # most covariates are significant at 5% 
+# maybe consider dropping WEEK_END_DATE
+# Residual Deviance is 4610.8
+
+
+# Some diagnostic plots
+par(mfrow=c(2,2))
+plot(quasi_glm_sqrt)
+par(mfrow=c(1,1))
+# residual vs fitted, scale location plots are improved significantly
+# Normality assumption is still violated on upper tail based on residual's Q-Q plot
+
+
+
+
+quasi_glm_mu2_log <- glm(UNITS~.-BASE_PRICE-STORE_NUM-TPR_ONLY-MANUFACTURER, 
+                 data=train_set, family = quasi(variance="mu^2",link="log")) #, start=rep(0.8,16)
+summary(quasi_glm_mu2_log) # most covariates are significant at 5%
+# Residual Deviance is 4558.6
+# ANOVA table with f test (unknown dispersion)
+anova(quasi_glm_mu2_log, test = "F") #all significant
+
+# Some diagnostic plots
+par(mfrow=c(2,2))
+plot(quasi_glm_mu2_log)
+par(mfrow=c(1,1))
+# The variance changes slightly based on residual vs fitted plot
+# Normality assumption is still violated based on residual's Q-Q plot 
+
+
+
+
+# Quasi regression with log transformation for the response, variance= mean (poisson like)
+# log Link function 
+quasi_transf_mu_log <- glm(log(UNITS)~.-BASE_PRICE-STORE_NUM-TPR_ONLY-MANUFACTURER, 
+                 data=train_set, family = quasi(variance="mu",link="log")) #, start=rep(0.8,16)
+summary(quasi_transf_mu_log) # most covariates are significant at 5%
+# Residual Deviance is 3827.3
+
+# ANOVA table with f test (unknown dispersion)
+anova(quasi_transf_mu_log, test = "F") #all significant
+
+# Some diagnostic plots
+par(mfrow=c(2,2))
+plot(quasi_transf_mu_log)
+par(mfrow=c(1,1))
+# The variance changes slightly based on residual vs fitted plot, quite homoscedastic res
+# Normality assumption is not violated based on residual's Q-Q plot
+
+# This model is harder for back-transform 
+
+
+
+# 2) Negative Binomial regression
+# Negative binomial regression -Negative binomial regression can be used for 
+# over-dispersed count data, that is when the conditional variance exceeds the 
+# conditional mean. It can be considered as a generalization of Poisson 
+# regression since it has the same mean structure as Poisson regression and it 
+# has an extra parameter to model the over-dispersion. If the conditional 
+# distribution of the outcome variable is over-dispersed
+
+nb_glm_log <- glm.nb(UNITS ~.-BASE_PRICE-STORE_NUM-TPR_ONLY-MANUFACTURER, 
+                 data=train_set, link=log)
+summary(nb_glm_log) # most covariates are significant at 5%
+# Residual Deviance is 9090.1  AIC: 56358
+
+#(AIC_nb_glm_log <- AIC(nb_glm_log)) #model's AIC 62547.38
+
+# Some diagnostic plots
+par(mfrow=c(2,2))
+plot(nb_glm_log)
+par(mfrow=c(1,1))
+# The variance changes slightly based on residual vs fitted plot
+# Normality assumption is still violated based on residual's Q-Q plot
+
+
+
+# 3) GLM family Gamma
+
+gamma_glm_log <- glm(UNITS~.-BASE_PRICE-STORE_NUM-TPR_ONLY-MANUFACTURER, 
+                 data=train_set, family=Gamma(link = "log"))
+summary(gamma_glm_log) # most covariates are significant at 5%
+
+
+#(AIC_gamma_glm_log <- AIC(gamma_glm_log)) #model's AIC 19641.7
+#-2*logLik(gamma_glm_log)+2*17
+# Some diagnostic plots
+par(mfrow=c(2,2))
+plot(gamma_glm_log)
+par(mfrow=c(1,1))
+# The variance changes slightly based on residual vs fitted plot
+# Normality assumption is still violated based on residual's Q-Q plot
+
+
+# In terms of AIC The Gamma GLM model seems to have the minimum, the Linear Regression
+# model with the log transformed response being the second best. The Negative Binomial 
+# GLM being worse than these but still better than the Poisson GLM.
+
+```
+```{r, eval=F, echo=F}
+
+model_RMSE <- function(model) {
+  Rmse <- sqrt(mean((predict(model, test_set, type="response") - test_set$UNITS)^2 ) )
+  cat("The RMSE of the Linear model with Log transformation is",Rmse )
+ 
+}
+model_RMSE(lm2) #rmse on 10th fold is 9.872
+model_RMSE(poisson_glm_log) #9.697895
+model_RMSE(nb_glm_log) #9.724236
+model_RMSE(gamma_glm_log) #9.727156
+model_RMSE(quasi_glm_log) #9.697895
+model_RMSE(quasi_glm_mu2_log) #9.727156
+model_RMSE(quasi_transf_mu_log) #10.94393 #needs adjustment
+
+
+```
+
+```{r, echo = FALSE, eval = FALSE}
+AICvector <- cbind(poisson_glm_log$aic, nb_glm_log$aic, gamma_glm_log$aic)
+indexeorder <- order(cbind(poisson_glm_log$deviance, nb_glm_log$deviance, 
+                           gamma_glm_log$deviance,  quasi_glm_log$deviance,
+                           quasi_glm_mu2_log$deviance, quasi_glm_sqrt$deviance,
+                           quasi_transf_mu_log$deviance), decreasing = F)
+deviances <- rbind(poisson_glm_log$deviance, nb_glm_log$deviance, 
+                           gamma_glm_log$deviance,  quasi_glm_log$deviance,
+                           quasi_glm_mu2_log$deviance, quasi_glm_sqrt$deviance,
+                           quasi_transf_mu_log$deviance)
+
+rownames(deviances) <- c("poisson","NB", "Gamma", "quasipoisson","mu^2 log",
+                         "sqrt","transf")
+knitr::kable(deviances)
+
+
+
+hist(groc2$UNITS, probability = T, ylim=c(0,0.1), breaks=60)
+lines(density(gamma_glm_log$fitted.values), col="blue")
+
+
+lines(density(quasi_transf_mu_log$fitted.values))
+lines(density(groc2$UNITS), col="red")
+
+```
+
+
+```{r, echo = FALSE, eval = FALSE}
+set.seed(30)
+n <- nrow(groc2)
+k <- 10 # Number of folds
+fold_idx <- sample(cut(1:n, breaks = k, labels = FALSE))
+glmnb_rmse_error_cv <- rep(0, k)
+
+summary(nb_glm_log)
+
+for (j in 1:k) {
+  # Get the k-th partition
+  test_idx <- which(fold_idx == j)
+  train_set <- groc2[-test_idx, ]
+  test_set <- groc2[test_idx, ]
+  
+  # Train and test the model
+  glm_spl_cv <- glm.nb( UNITS ~ . - BASE_PRICE - STORE_NUM - TPR_ONLY -MANUFACTURER,
+                        data=train_set, link = "log")
+  y_hat <- predict(glm_spl_cv, test_set, type="response")
+
+  glmnb_rmse_error_cv[j] <- sqrt(mean( (test_set$UNITS - y_hat)^2 ) )
+}
+glmnb_rmse_error_cv
+mean(glmnb_rmse_error_cv)
+# Negative Binomial regression 10-fold CV RMSE is 9.8513
+
+
+summary(gamma_glm_log)
+gamma_rmse_error_cv <- rep(0,k)
+
+for (j in 1:k) {
+  # Get the k-th partition
+  test_idx <- which(fold_idx == j)
+  train_set <- groc2[-test_idx, ]
+  test_set <- groc2[test_idx, ]
+  
+  # Train and test the model
+  glm_spl_cv <- glm(UNITS~ . - BASE_PRICE - STORE_NUM - TPR_ONLY -MANUFACTURER,
+                    data=train_set, family = Gamma( link="log"))
+  y_hat <- predict(glm_spl_cv, test_set, type="response")
+
+  gamma_rmse_error_cv[j] <- sqrt(mean( (test_set$UNITS - y_hat)^2 ) )
+}
+gamma_rmse_error_cv
+mean(gamma_rmse_error_cv)
+# Gamma regression 10-fold CV RMSE is 9.8726
+
+
+
+summary(poisson_glm_log)
+poisson_rmse_error_cv <- rep(0,k)
+
+for (j in 1:k) {
+  # Get the k-th partition
+  test_idx <- which(fold_idx == j)
+  train_set <- groc2[-test_idx, ]
+  test_set <- groc2[test_idx, ]
+  
+  # Train and test the model
+  glm_spl_cv <- glm(UNITS~ . - BASE_PRICE - STORE_NUM - TPR_ONLY -MANUFACTURER,
+                    data=train_set, family = poisson( link="log"))
+  y_hat <- predict(glm_spl_cv, test_set, type="response")
+
+  poisson_rmse_error_cv[j] <- sqrt(mean( (test_set$UNITS - y_hat)^2 ) )
+}
+poisson_rmse_error_cv
+mean(poisson_rmse_error_cv)
+# Poisson regression 10-fold CV RMSE is 9.813295
+
+
+summary(quasi_glm_mu2_log)
+quasi_mu2_rmse_error_cv <- rep(0,k)
+
+for (j in 1:k) {
+  # Get the k-th partition
+  test_idx <- which(fold_idx == j)
+  train_set <- groc2[-test_idx, ]
+  test_set <- groc2[test_idx, ]
+  
+  # Train and test the model
+  glm_spl_cv <- glm(UNITS~ . - BASE_PRICE - STORE_NUM - TPR_ONLY -MANUFACTURER,
+                    data=train_set, family = quasi(variance = "mu", link = "log"))
+  y_hat <- predict(glm_spl_cv, test_set, type="response")
+
+  quasi_mu2_rmse_error_cv[j] <- sqrt(mean( (test_set$UNITS - y_hat)^2 ) )
+}
+quasi_mu2_rmse_error_cv
+poisson_rmse_error_cv
+mean(quasi_mu2_rmse_error_cv)
+# quasi mu^2 log link regression 10-fold CV RMSE is 9.813295
+
+
+summary(quasi_glm_log)
+quasi_rmse_error_cv <- rep(0,k)
+
+for (j in 1:k) {
+  # Get the k-th partition
+  test_idx <- which(fold_idx == j)
+  train_set <- groc2[-test_idx, ]
+  test_set <- groc2[test_idx, ]
+  
+  # Train and test the model
+  glm_spl_cv <- glm(UNITS~ . - BASE_PRICE - STORE_NUM - TPR_ONLY -MANUFACTURER,
+                    data=train_set, family = quasipoisson(link = "log"))
+  y_hat <- predict(glm_spl_cv, test_set, type="response")
+
+  quasi_rmse_error_cv[j] <- sqrt(mean( (test_set$UNITS - y_hat)^2 ) )
+}
+quasi_rmse_error_cv
+poisson_rmse_error_cv
+mean(quasi_rmse_error_cv)
+# quasipoisson log link regression 10-fold CV RMSE is 9.813295
+
+
+
+summary(quasi_transf_mu_log)
+quasi_transf_rmse_error_cv <- rep(0,k)
+
+for (j in 1:k) {
+  # Get the k-th partition
+  test_idx <- which(fold_idx == j)
+  train_set <- groc2[-test_idx, ]
+  test_set <- groc2[test_idx, ]
+  
+  # Train and test the model
+  glm_spl_cv <- glm(log(UNITS)~ . - BASE_PRICE - STORE_NUM - TPR_ONLY -MANUFACTURER,
+                    data=train_set, family = quasi(variance = "mu",link = "log"))
+  y_hat <- exp(predict(glm_spl_cv, test_set, type="response"))
+
+  quasi_transf_rmse_error_cv[j] <- sqrt(mean( (test_set$UNITS - y_hat)^2 ) )
+}
+quasi_transf_rmse_error_cv
+poisson_rmse_error_cv
+mean(quasi_transf_rmse_error_cv)
+# quasi log link regression with log-transf 10-fold CV RMSE is 10.97346
+
+
+summary(lm2)
+lm2_rmse_error_cv <- rep(0,k)
+
+for (j in 1:k) {
+  # Get the k-th partition
+  test_idx <- which(fold_idx == j)
+  train_set <- groc2[-test_idx, ]
+  test_set <- groc2[test_idx, ]
+  
+  # Train and test the model
+  glm_spl_cv <- lm(log(UNITS) ~ . - BASE_PRICE - STORE_NUM - TPR_ONLY -MANUFACTURER,
+                    data=train_set)
+  y_hat <- exp(predict(glm_spl_cv, test_set))
+
+  lm2_rmse_error_cv[j] <- sqrt(mean( (test_set$UNITS - y_hat)^2 ) )
+}
+lm2_rmse_error_cv
+poisson_rmse_error_cv
+mean(lm2_rmse_error_cv)
+# Linear regression with log transformation 10-fold CV RMSE is 10.18875
+
+
+
+```
+
+# Modern Regression models
+
+### Regression Tree and Random Forest
+A Regression Tree model was fitted on the training set with the same inputs as the GLM models.
+Using 10-fold Cross Validation to determine optimal size led us to keep the whole tree.
+The RMSE on the 10th fold was $9.72976$.
+As for the Random Forest, a plot of the importance of the features confirmed that 
+the covariates that were 
+excluded so far had the lowest increase in MSE when they are removed from the model.
+A custom grid search using 5 fold CV was used in order to determine the optimal 
+values for number of trees (ntree for values 300,500,1000) and the number of variables
+available for splitting at each tree node (mtry for values 2,3,4).
+The optimal parameters were $ntree=1000$ and $mtry=4$.
+The RMSE on the 10th fold was $8.74104$.
+
+```{r, echo = FALSE, eval = FALSE}
+# Starting by fitting a regression tree model to 90% of the grocery data
+# Run time: a few seconds
+
+library(tree)
+tree1 <- tree(UNITS~.-BASE_PRICE-STORE_NUM-TPR_ONLY-MANUFACTURER , data=train_set) #fitting tree model
+summary(tree1)  #summary 11 terminal nodes 93.6 residual mean deviance
+
+#plot of the tree
+plot(tree1)
+text(tree1)
+
+# 10-fold CV to determine best tree size based on deviance
+tree1_cv <- cv.tree(tree1, K = 10)
+print(tree1_cv)
+opt_size <- tree1_cv$size[which.min(tree1_cv$dev)]
+tree1_pruned <- prune.tree(tree1, best = opt_size) #optimal size is full tree 11 terminal nodes
+
+#  Plot of tree deviance vs tree size (elbow method)
+plot(x=tree1_cv$size,y=tree1_cv$dev, type='b')
+
+tree_rmse_error_cv <- rep(0,k)
+
+for (j in 1:k) {
+  # Get the k-th partition
+  test_idx <- which(fold_idx == j)
+  train_set <- groc2[-test_idx, ]
+  test_set <- groc2[test_idx, ]
+  
+  # Train and test the model
+  tree_spl_cv <- tree(UNITS~. - BASE_PRICE - STORE_NUM - TPR_ONLY -MANUFACTURER, data=train_set)#tree_spl_cv <- tree(UNITS~-STORE_NUM, data=train_set)
+  y_hat <- predict(tree_spl_cv, test_set)
+
+  tree_rmse_error_cv[j] <- sqrt(mean( (test_set$UNITS - y_hat)^2 ) )
+}
+
+tree_rmse_error_cv
+mean(tree_rmse_error_cv)
+#regression tree 10-fold CV RMSE is 10.44596
+sqrt(mean( (predict(tree1, test_set) - test_set$UNITS)^2 ) )
+```
+
+
+
+```{r, echo = FALSE, eval = FALSE}
+# The following code is part of a function I have written in the past that searches 
+# through all possible combinations of ntree and mtry for the values specified
+
+
+# Selecting variables to include in random forest model based on importance metric
+units_rf <- randomForest(UNITS ~.-STORE_NUM, data = train_set, ntree=500 ,
+                         importance = TRUE )
+# creating a RF model and calculating importance for each feature
+# imp <- importance(units_rf, type = 1)
+
+# Plot of the importance of variables based on MSE and node purity
+varImpPlot(units_rf)
+# TPR_ONLY, BASE_PRICE and MANUFACTURER and STORE_NUM seem to have the lowest
+#  increase in MSE when they are removed
+# As for the linear and GLM models, we will not include TPR_ONLY, BASE_PRICE, 
+# STORE_NUM and MANUFACTURER
+
+
+# 5-fold Cross Validation on the the first 9 folds of the datat as specified previously
+# Fold number 10 wasn't used
+# Use of the caret package for grid search
+# for optimal values for number of trees (ntree for values 300,500,1000) and and the number of variables
+# available for splitting at each tree node (mtry for values 2,3,4).
+
+# This chunk was running for 
+# > TimeTaken
+# Time difference of 5.637479 mins
+
+# Optimal parameters mtry=4 and ntree=1000
+
+library(caret)
+
+# setting up train control and search grid for mtry for caret's train function
+control <- trainControl(method="cv", number=5, search="grid") #5-fold CV
+tunegrid <- expand.grid(mtry = c(2,3,4)) #mtry values to try
+mtrylist <- list()  # setting up lists for parameters and rmse values
+modellist <- list()
+
+# As specified for the LM and GLM models
+# As training set the first 9 folds were used
+
+test_idx <- which(fold_idx == 10)
+train_set <- groc2[-test_idx, ]
+test_set <- groc2[test_idx, ]
+
+StartTime = Sys.time()  # keeping track of how much time it will be running for
+ 
+for (ntree in c(300, 500, 1000)) {     #for loop to evaluate ntree values
+    
+    #set.seed(3)
+    fit <- train(UNITS~.-BASE_PRICE -STORE_NUM -TPR_ONLY -MANUFACTURER,
+                 data=train_set, method="rf", metric="RMSE",
+        tuneGrid=tunegrid, trControl=control, ntree=ntree) #fitting a random forest model
+    
+    key <- toString(ntree)
+    mtrylist[[key]] <- fit$bestTune #saving the best values for ntree and mtry
+    modellist[[key]] <- min(fit$results$RMSE)
+  
+}
+
+  # compare results
+mtry = unlist(mtrylist[names(modellist[which.min(modellist)])])
+  
+numberoftrees = as.numeric(names(modellist[which.min(modellist)]))
+# fITTING RANDOM FOREST WITH OPTIMAL PARAMETERS FROM THE GRID SEARCH  
+RFout <- randomForest(UNITS~.- BASE_PRICE - STORE_NUM - TPR_ONLY -MANUFACTURER,
+                        data = train_set ,mtry= mtry, ntree=numberoftrees)
+print(RFout)
+cat("Training Completed.\n")
+#rmse on tenth fold
+sqrt(mean( (predict(RFout, test_set) - test_set$UNITS)^2 ) )
+
+#   Call:
+# randomForest(formula = UNITS ~ . - BASE_PRICE - STORE_NUM - TPR_ONLY -      MANUFACTURER, data = train_set, mtry = #mtry, ntree = numberoftrees) 
+#               Type of random forest: regression
+#                     Number of trees: 1000
+#No. of variables tried at each split: 4
+#
+#          Mean of squared residuals: 86.52739
+#                    % Var explained: 54.34
+
+  EndTime = Sys.time()
+  TimeTaken = EndTime - StartTime
+  cat("\nTime taken for training: ",TimeTaken)
+
+
+```
+
+```{r, echo = FALSE, eval = FALSE}
+# 10 fold cross validation for RF model with optimal parameters as determined above
+# to evaluate RMSE in every fold and average RMSE for all 10 folds
+# 
+rf_rmse_error_cv <- rep(0,k)
+
+for (j in 1:k) {
+    # Get the k-th partition
+    test_idx <- which(fold_idx == j)
+   train_set <- groc2[-test_idx, ]
+    test_set <- groc2[test_idx, ]
+    
+    # Train and test the model
+    rf_spl_cv <- randomForest(UNITS ~.-BASE_PRICE-STORE_NUM-TPR_ONLY-MANUFACTURER,
+                         data=train_set, ntree=1000, mtry=4 ) 
+    y_hat <- predict(rf_spl_cv, test_set)
+  
+   rf_rmse_error_cv[j] <- sqrt(mean( (test_set$UNITS - y_hat)^2 ) )
+}
+rf_rmse_error_cv
+mean(rf_rmse_error_cv)
+
+library(randomForest)
+rf_rmse_error_cv <- rep(0,k)
+  
+for (j in 1:k) {
+    # Get the k-th partition
+    test_idx <- which(fold_idx == j)
+    train_set <- groc2[-test_idx, ]
+    test_set <- groc2[test_idx, ]
+    
+    # Train and test the model
+    rf_spl_cv <- randomForest(UNITS ~ . - BASE_PRICE - STORE_NUM - TPR_ONLY -MANUFACTURER,
+                              data=train_set, ntree=1000,
+                              mtry=4  ) 
+    y_hat <- predict(rf_spl_cv, test_set)
+  
+    rf_rmse_error_cv[j] <- sqrt(mean( (test_set$UNITS - y_hat)^2 ) )
+}
+
+rf_rmse_error_cv
+mean(rf_rmse_error_cv) # average RMSE over 10-folds is 9.217078
+
+
+
+
+```
+
+### XGBoost
+For this model, the categorical and boolean variables were transformed to dummy
+variables (one-hot encoding). Then a plot of the features' importance confirmed
+our findings about the variables in the dataset. The optimal hyperparameter values
+for nrounds and maximum depth were assessed through 5-fold CV and were found to be 
+313 and 5 respectively. The RMSE of the predictions on the 10th fold was $6.53811$,
+which is significantly better to all of the previous models.
+
+```{r, echo = FALSE, eval = T, warning=F, fig.height=2,message=FALSE}
+
+#length(levels(groc2$UPC))
+
+#groc3 = as.matrix(groc2)
+
+#library(caret)
+# Transforming categorical and boolean to dummy variables/ One-hot encoding
+# to be used as inputs on the xgboost model
+library(caret)
+dmy <- dummyVars(" ~ .", data = groc2)  
+trsf <- data.frame(predict(dmy, newdata = groc2))
+
+test_idx <- which(fold_idx == 10)
+train_set <- trsf[-test_idx, ]
+test_set <- trsf[test_idx, ]
+
+library(xgboost)
+units_xgb <- xgboost(data = as.matrix(train_set[,-103]), #Fitting an XGBoost model on all features
+                      label = train_set$UNITS, nrounds = 200, verbose = FALSE)
+library(dplyr)
+library(stringr)  #calculating feature importance
+imp <- xgb.importance(model = units_xgb)
+# removing making all variables that correspond to levels of the same variable 
+# from grocery.csv have the same name
+to_delete <- c("1|2|3|4|5|6|7|8|9|0|FALSE|TRUE|KING|PRIVATE.LABEL|TONYS|TOMBSTONE")
+imp$Feature <- str_remove_all(imp$Feature, to_delete)
+# Summarising the importance output per initial variable to assess total importance
+# and plotting the results 
+imp %>% group_by(Feature) %>%
+  summarise(Gain = sum(Gain), Cover = sum(Cover), Frequency = sum(Frequency)) %>%
+  ggplot(aes(x = reorder(Feature, Gain ), y = Gain)) +
+  geom_bar(stat = 'identity', fill = 'tomato') +
+  labs(x = '', y = '', title = 'Feature Importance') +
+  coord_flip() +
+  theme_minimal()
+
+# TPR_ONLY will not be used and perhaps MANUFTARURER as well
+
+```
+
+```{r, echo = FALSE, eval = FALSE}
+# Best nrounds determined through 5-fold CV
+# This part is redundant since nrounds is optimised below with max depth
+#-----------------------------------------------------------------------------
+units_xgb_cv <- xgb.cv(data = as.matrix(train_set[,-c(103,102,101,93,94,95,96)]),
+               #removed the columns corresponding to MANUFACTURER, TPR and UNITS
+                       label = train_set$UNITS, nfold = 5, nrounds = 500)
+
+best_nrounds <- which.min(units_xgb_cv$evaluation_log$test_rmse_mean)
+cat("Estimated best ensemble size:", best_nrounds, "\n")
+
+# Plot of CV rmse vs nrounds
+plot(1:500,units_xgb_cv$evaluation_log$test_rmse_mean, type='b',
+     ylim=c(6.9,8.2), main="XGBoost CV RMSE vs No. of rounds",
+     xlab = "No. of rounds", ylab = "CV RMSE")
+#-----------------------------------------------------------------------------
+
+
+
+max_depth_options <- c(5, 7, 10)#max depth options for the XGBoost trees
+folds <- NULL  #initialising some variables for the for loop
+best_error <- Inf
+best_md <- 0
+best_nrounds <- 0
+
+# This code was taken from LAB 7 of STAT0030
+# evaluating by comparing RMSE of 5-fold CV best max depth and nrounds
+
+for (md in max_depth_options) {
+  cat("Trying maximum depth of", md, "...\n")
+  units_xgb_cv <- xgb.cv(data = as.matrix(train_set[,-c(103,102,101,93,94,95,96)]),
+                         label = train_set$UNITS,
+                          nfold = 5, nrounds = 500, max_depth = md,
+                         folds = folds, verbose = FALSE)
+  if (is.null(folds)) {
+    folds <- units_xgb_cv$folds
+  }
+  trial_error <- min(units_xgb_cv$evaluation_log$test_rmse_mean)
+  if (trial_error < best_error) {
+    best_error <- trial_error
+    best_md <- md
+    best_nrounds <- which.min(units_xgb_cv$evaluation_log$test_rmse_mean)
+  }
+}
+
+cat("Hyperparameter selection: best nrounds is", best_nrounds,
+    "and best maximum depth is", best_md, "\n")
+# fitting the model with train data 1-9 folds
+units_xgb_opt <- xgboost(data = as.matrix(train_set[,-c(103,102,101,93,94,95,96)]),
+                         label = train_set$UNITS,
+                          nrounds = best_nrounds, max_depth = best_md, verbose = FALSE)
+
+# predicting values for test set (10th fold that was held out)
+units_xgb_opt_pred <- predict(units_xgb_opt, as.matrix(test_set[,-c(103,102,101,93,94,95,96)]) )
+
+str(units_xgb_opt) 
+
+cat("Root Mean Square Error for optimised XGB:",
+    sqrt(mean((units_xgb_opt_pred - test_set$UNITS)^2)), "\n") 
+#RMSE on test set is 6.538114
+```
+
+```{r, eval=T, echo=F, warning=F, message=F}
+xgb_rmse_error_cv <- rep(0,k)
+  
+for (j in 1:k) {
+    # Get the k-th partition
+    test_idx <- which(fold_idx == j)
+    
+    train_set <- trsf[-test_idx, ]
+    test_set <- trsf[test_idx, ]
+    
+    # Train and test the model
+    xgb_spl_cv <- xgboost(data = as.matrix(train_set[,-c(103,102,101,93,94,95,96)]),
+                         label = train_set$UNITS,
+                          nrounds = 313, max_depth = 5, verbose = FALSE)
+      
+    y_hat <- predict(xgb_spl_cv, as.matrix(test_set[,-c(103,102,101,93,94,95,96)]))
+  
+    xgb_rmse_error_cv[j] <- sqrt(mean( (test_set$UNITS - y_hat)^2 ) )
+}
+
+#xgb_rmse_error_cv
+#cat("Mean RMSE of the XGBoost for the 10 folds",mean(xgb_rmse_error_cv)) # average RMSE over 10-folds is 6.757558
+
+
+
+
+test_idx <- which(fold_idx == 10)
+train_set <- groc2[-test_idx, ]#1-9 folds will be used for training
+test_set <- groc2[test_idx, ]
+
+quasi_glm_log <- glm(UNITS~.-BASE_PRICE-STORE_NUM-TPR_ONLY-MANUFACTURER, 
+                 data=train_set, family = quasipoisson(link="log"))
+
+quasi_rmse_error_cv <- rep(0,k)
+
+for (j in 1:k) {
+  # Get the k-th partition
+  test_idx <- which(fold_idx == j)
+  train_set <- groc2[-test_idx, ]
+  test_set <- groc2[test_idx, ]
+  
+  # Train and test the model
+  glm_spl_cv <- glm(UNITS~ . -BASE_PRICE -STORE_NUM - TPR_ONLY -MANUFACTURER,
+                    data=train_set, family = quasipoisson(link = "log"))
+  y_hat <- predict(glm_spl_cv, test_set, type="response")
+
+  quasi_rmse_error_cv[j] <- sqrt(mean( (test_set$UNITS - y_hat)^2 ) )
+}
+#quasi_rmse_error_cv
+
+#cat("Mean RMSE of the Quasipoisson for the 10 folds",mean(quasi_rmse_error_cv))
+# quasipoisson log link regression 10-fold CV RMSE is 9.813295
+
+
+```
+```{r, eval=F,echo=F}
+imp <- xgb.importance(model = units_xgb_opt)
+# removing making all variables that correspond to levels of the same variable 
+# from grocery.csv have the same name
+to_delete <- c("1|2|3|4|5|6|7|8|9|0|FALSE|TRUE|KING|PRIVATE.LABEL|TONYS|TOMBSTONE")
+imp$Feature <- str_remove_all(imp$Feature, to_delete)
+# Summarising the importance output per initial variable to assess total importance
+# and plotting the results 
+imp %>% group_by(Feature) %>%
+  summarise(Gain = sum(Gain), Cover = sum(Cover), Frequency = sum(Frequency)) %>%
+  ggplot(aes(x = reorder(Feature, Gain ), y = Gain)) +
+  geom_bar(stat = 'identity', fill = 'tomato') +
+  labs(x = '', y = '', title = 'Feature Importance') +
+  coord_flip() +
+  theme_minimal()
+
+units_xgb_opt$feature_names
+
+```
+
+```{r, eval=F, echo=F}
+t.test(xgb_rmse_error_cv,quasi_rmse_error_cv, paired = F)
+```
+# Comparison of models
+
+The models that were chosen was the Quasipoisson with log link function from the GLM
+family and the XGBoost from the modern regression models. The latter's main advantage is 
+the high prediction quality, even though it is rather complex to explain, visualise
+or get the intuition when making predictions. The GLM is much more straightforward,
+the log link suggests that logarithm of the mean of the response if a function of the 
+covariates. 
+The Quasipoisson model seemed to perform better than the rest of the models and equally
+well as the Poisson one. But for the latter one, the assumptions were violated to a 
+larger degree. As for the XGBoost model, it simply outperformed all the other models by 
+a considerable margin. The mean RMSE for the 10 folds was $9.8133$ for the Quasipoisson
+and $6.7576$ for the XGBoost.
+
+A paired t-test was perform for the RMSEs of the two models for each of the 10 folds.
+The t-test ha a p-value of the order $10^{-8}$ which suggests that the mean is significantly 
+different than zero, which mean that the RMSE is different (much lower for the XGBoost).
+
+# Final model
+
+The final model for the task of prediction of UNITS variable or the sales of grocery 
+products was an XGBoost model, with weak learners (trees) of maximum depth 5 and a 
+maximum number of 313 boosting iterations. The number of features were 96, most of which
+are the dummified version of categorical variables. The eta parameter  could also be 
+optimised further, since the default value of $0.3$ was used. The features of the model
+were PRICE, BASE_PRICE, WEEK_END_DATE, STORE_NUM, UPC, DISPLAY and FEATURE.
+Based on the importance 
+of the features of the optimised XGBoost model and with respect to Gain, DISPLAY,
+PRICE and STORE_NUM were the most important features.
+Hence, we may presume that the sales of a product are dependent on whether it was on
+display in the store. Other than that, the different stores seem to affect the sales
+as well as the initial price of the products.
+
+This final model estimates for the product with UPC = 7192100337, during WEEK END DATE
+= 39995 at STORE NUM = 8263 that by decreasing the PRICE by $10%$ and keeping all
+of the other covariates constant that there would be 11.70641 UNITS sold. Of course,
+we need an integer value so we would probably go for 12 UNITS. That's a decrease of 1
+UNITS from the original PRICE.
+
+\normalsize
+## Appendix
+In most of the residual vs fitted plots for lm and glm models there appear to be 
+parallel lines. After some brief research on the topic, it appears to be natural 
+for data with integer values.
+References: (https://www.tandfonline.com/doi/abs/10.1080/00031305.1988.10475569#)
+(http://www.mensurationists.com/docs/conf2016/Wang_Mingliang.pdf)
+
+```{r, eval=F, echo=F}
+#obtaining the values that are specified in 6) d)
+dat <- filter(groc2,UPC == "7192100337" & WEEK_END_DATE==39995 & STORE_NUM == "8263")
+dat_reducedprice <- dat
+dat_reducedprice$PRICE <- dat$PRICE*0.9
+rbind(dat, dat_reducedprice)
+
+library(caret)
+# one-hot encoding for the vector to be used as new data and predict units with xgb
+dmy <- dummyVars(" ~ .", data = dat_reducedprice)  
+one_hot <- data.frame(predict(dmy, newdata = dat_reducedprice))
+# Making prediction with optimised xgb
+(pr<-predict(units_xgb_opt, as.matrix(one_hot[-c(103,102,101,93,94,95,96)])))
+# prediction is 11.70641
+
+```
+
+
+
+
+
+```{r, echo = FALSE, eval = FALSE}
+# use eval = FALSE if you don't need the output to appear in the final report - for example, a model you tried that didn't work well. 
+# some more computations
+```
+
